@@ -10,6 +10,10 @@ Stand up a GenAI server on your own available hardware. This project provides a 
 
 ## Setup
 
+Fork this repository, setup GitHub Pages, and set the repository secret `NEXT_PUBLIC_API_URL` to the URL of the backend.
+
+The frontend will be available at `https://[username].github.io/PersonalAIserver`. Follow the instructions below to set up the backend.
+
 ### Backend
 1. Create conda environment
 ```
@@ -27,7 +31,10 @@ pip install -r requirements.txt
 - Agree to model's terms of use: https://huggingface.co/stabilityai/stable-diffusion-3.5-large, https://huggingface.co/meta-llama/Llama-3.2-1B
 - Create a read-only personal access token: https://huggingface.co/settings/tokens
 
-### Frontend
+## Local Frontend
+
+In case you want to run the frontend locally, follow the instructions below.
+
 1. Setup app environment
 ```
 npx create-next-app@latest frontend --typescript --tailwind --eslint
