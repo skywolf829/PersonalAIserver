@@ -46,7 +46,6 @@ cd frontend
 npm install -D @shadcn/ui
 npx shadcn-ui init
 npx shadcn@latest add alert button card input textarea
-npm install react-markdown remark-gfm react-syntax-highlighter @types/react-syntax-highlighter lucide-react --legacy-peer-deps
 npm install -D @tailwindcss/typography
 ```
 
