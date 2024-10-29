@@ -31,6 +31,10 @@ pip install -r requirements.txt
 - Agree to model's terms of use: https://huggingface.co/stabilityai/stable-diffusion-3.5-large, https://huggingface.co/meta-llama/Llama-3.2-1B
 - Create a read-only personal access token: https://huggingface.co/settings/tokens
 
+4. Running the backend
+- Log in to Hugging Face with `huggingface-cli login` and use your personal access token
+- Run the backend with `python backend/backend.py`
+
 ## Local Frontend
 
 In case you want to run the frontend locally, follow the instructions below.
@@ -46,10 +50,11 @@ npm install react-markdown remark-gfm react-syntax-highlighter @types/react-synt
 npm install -D @tailwindcss/typography
 ```
 
-## Running the backend
-1. Log in to Hugging Face with `huggingface-cli login` and use your personal access token
-2. Run the backend with `python backend/backend.py`
+2. Running the local frontend
+```
+npm run dev
+```
 
-## Running the frontend
-1. Run the frontend with `npm run dev`
+
+
 

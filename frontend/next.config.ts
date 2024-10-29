@@ -2,7 +2,7 @@
 const nextConfig = {
   transpilePackages: ['lucide-react'],
   output: 'export',  // Enable static exports
-  basePath: '/PersonalAIserver', // Replace with your repo name
+  basePath: process.env.NODE_ENV === 'production' ? '/PersonalAIserver' : '',
   images: {
     unoptimized: true,
   },
