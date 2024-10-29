@@ -55,6 +55,7 @@ npm install -D @tailwindcss/typography
 npm run dev
 ```
 
-
+You can also build the frontend with `npm run build` and serve it with your backend.
+This is also needed for GitHub Pages deployment if you make local changes to the frontend.
 
 
