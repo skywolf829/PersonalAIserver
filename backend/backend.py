@@ -3,7 +3,7 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM, pipeline
+from transformers import pipeline
 from diffusers import StableDiffusion3Pipeline, BitsAndBytesConfig, SD3Transformer2DModel
 import uvicorn
 from typing import List, Optional
@@ -14,8 +14,9 @@ from passlib.context import CryptContext
 import logging
 import base64
 from io import BytesIO
-import os
 from pathlib import Path
+import argparse
+import psutil
 
 # Security configuration
 SECRET_KEY = "your-secret-key-here"  # Change this!
@@ -35,7 +36,10 @@ app = FastAPI(title="AI Server")
 # Configure CORS - Replace with your GitHub Pages URL
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://skywolf829.github.io", "http://localhost:3000"],
+    allow_origins=["https://skywolf829.github.io", 
+                   "http://localhost:3000"
+                   "https://swwurster.com"
+                   "https://api.swwurster.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -286,5 +290,19 @@ async def generate_image(
         model_used="stable-diffusion-3.5"
     )
 
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",
+        "cpu_percent": psutil.cpu_percent(),
+        "memory_percent": psutil.virtual_memory().percent,
+        "device": model_manager.device
+    }
 if __name__ == "__main__":
-    uvicorn.run("backend:app", host="127.0.0.1", port=8000)
+    
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--public", action="store_true", default=False, help="Run server with public access")
+    args = parser.parse_args()
+    
+    host = "0.0.0.0" if args.public else "127.0.0.1"
+    uvicorn.run("backend:app", host=host, port=8000)
