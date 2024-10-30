@@ -138,7 +138,8 @@ Below are the VRAM requirements for each model tested with.
 | Image | stabilityai/stable-diffusion-3.5-large | ~20-30 | Exceeds 4090 VRAM for long prompts |
 
 Note: VRAM usage may vary depending on image resolution, length of text prompts, and other parameters. Values shown are approximate for default settings. 
-Quantized transformer models are supported to further reduce VRAM usage, but are not used by default.
+Quantized transformer models are supported to further reduce VRAM usage, but are not used by default (see `backend/backend.py` lines 178-192).
+The large stable diffusion model can barely fit in my 4090's VRAM with quantization.
 Chatbot speeds are extremely quick on my 4090, with image generation taking up to 30sec for 100 steps for 1024x1024 images.
 
 ## Notes and disclaimers
