@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import torch
 from transformers import pipeline
-from diffusers import StableDiffusion3Pipeline, BitsAndBytesConfig, SD3Transformer2DModel
+from diffusers import StableDiffusion3Pipeline, BitsAndBytesConfig, SD3Transformer2DModel, DiffusionPipeline
 import uvicorn
 from typing import List, Optional
 from datetime import datetime, timedelta
@@ -17,9 +17,11 @@ from io import BytesIO
 from pathlib import Path
 import argparse
 import psutil
+import asyncio
+from collections import deque
 
 # Security configuration
-SECRET_KEY = "your-secret-key-here"  # Change this!
+SECRET_KEY = Path(__file__).parent.joinpath(".secret").read_text()
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30
 
@@ -71,14 +73,50 @@ class GenerationResponse(BaseModel):
     content_type: str
     model_used: str
 
-# User database - Replace with your desired username/password
-USERS_DB = {
-    "admin": {
-        "username": "admin",
-        "hashed_password": pwd_context.hash("admin"),  # Change this!
-        "disabled": False
-    }
-}
+class QueuedRequest:
+    def __init__(self, user: str, prompt: str, request_type: str):
+        self.user = user
+        self.prompt = prompt
+        self.request_type = request_type
+        self.timestamp = datetime.utcnow()
+
+class RequestQueue:
+    def __init__(self):
+        self.queue = deque()
+        self.lock = asyncio.Lock()
+        self.processing = False
+    
+    def add_request(self, request: QueuedRequest) -> int:
+        self.queue.append(request)
+        return len(self.queue)
+    
+    def get_position(self, user: str) -> int:
+        for i, req in enumerate(self.queue):
+            if req.user == user:
+                return i + 1
+        return 0
+    
+request_queue = RequestQueue()
+
+def load_users():
+    accounts_file = Path(__file__).parent / "users.json"
+    
+    # Load existing accounts
+    with open(accounts_file, 'r') as f:
+        users = json.load(f)
+    
+    hashed_users = {}
+    for user in users:
+        hashed_users[user] = {
+            "username": users[user]["username"],
+            "hashed_password": pwd_context.hash(users[user]["password"]),
+            "disabled": False
+        }
+    return hashed_users
+        
+
+# Replace the USERS_DB definition with:
+USERS_DB = load_users()
 
 class ModelManager:
     def __init__(self):
@@ -90,13 +128,13 @@ class ModelManager:
             "text": {
                 "model_id": "meta-llama/Llama-3.2-1B-Instruct",
                 "model_type": "text",
-                "cache_dir": CACHE_DIR / "Llama-3.2-1B-Instruct",
+                "cache_dir": CACHE_DIR / "Llama-3.2-1B",
                 "system_prompt": Path(__file__).parent.joinpath("system_prompt.txt").read_text()
             },
             "image": {
-                "model_id": "stabilityai/stable-diffusion-3.5-large",
+                "model_id": "stabilityai/stable-diffusion-3.5-medium",
                 "model_type": "image",
-                "cache_dir": CACHE_DIR / "stable-diffusion-3.5-large"
+                "cache_dir": CACHE_DIR / "stable-diffusion-3.5-medium"
             }
         }
         self.user_chat_history = {}
@@ -155,6 +193,7 @@ class ModelManager:
                     torch_dtype=torch.bfloat16,
                     cache_dir=str(cache_dir) if not is_cached else None
                 ).to(self.device)
+               
                 self.loaded_models[modality] = {"pipeline": model}
                 logger.info(f"Loaded image model from: {'cache' if is_cached else 'online'}")
                 # Save model if it wasn't cached
@@ -177,8 +216,11 @@ class ModelManager:
             pipeline = self.loaded_models["text"]["pipeline"]
             chat = self.user_chat_history[current_user.username]
             chat.append({"role": "user", "content": prompt})
-            result = pipeline(chat, max_length=1024)
+            result = pipeline(chat, max_new_tokens=512)
             self.user_chat_history[current_user.username] = result[0]["generated_text"]
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()  # Clear CUDA cache after generation
+            
             return result[0]["generated_text"][-1]['content']
         except Exception as e:
             logger.error(f"Error generating text: {str(e)}")
@@ -190,8 +232,9 @@ class ModelManager:
         
         try:
             pipeline = self.loaded_models["image"]["pipeline"]
-            image = pipeline(prompt, num_inference_steps=50, guidance_scale=3.5).images[0]
-            
+            image = pipeline(prompt, num_inference_steps=40, guidance_scale=4.5).images[0]
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()  # Clear CUDA cache after generation
             buffered = BytesIO()
             image.save(buffered, format="PNG")
             return base64.b64encode(buffered.getvalue()).decode()
@@ -268,27 +311,66 @@ async def generate_text(
     request: GenerationRequest,
     current_user: User = Depends(get_current_user)
 ):
-    text = await model_manager.generate_text(
-        request.prompt,
-        current_user
-    )
-    return GenerationResponse(
-        generated_content=text,
-        content_type="text",
-        model_used="llama-3.2"
-    )
+    queued_request = QueuedRequest(current_user.username, request.prompt, "text")
+    request_queue.add_request(queued_request)
+    async with request_queue.lock:
+        request_queue.processing = True
+        try:
+            text = await model_manager.generate_text(request.prompt, current_user)
+            request_queue.queue.popleft()  # Remove processed request
+            
+            # Notify next user in queue if any
+            if request_queue.queue:
+                next_position = 1
+                for req in request_queue.queue:
+                    # You would need to implement a notification system here
+                    logger.info(f"User {req.user} is now at position {next_position}")
+                    next_position += 1
+            
+            return GenerationResponse(
+                generated_content=text,
+                content_type="text",
+                model_used="llama-3.2"
+            )
+        finally:
+            request_queue.processing = False
 
 @app.post("/generate/image")
 async def generate_image(
     request: GenerationRequest,
     current_user: User = Depends(get_current_user)
 ):
-    image_b64 = await model_manager.generate_image(request.prompt)
-    return GenerationResponse(
-        generated_content=image_b64,
-        content_type="image",
-        model_used="stable-diffusion-3.5"
-    )
+    queued_request = QueuedRequest(current_user.username, request.prompt, "image")
+    request_queue.add_request(queued_request)
+
+    async with request_queue.lock:
+        request_queue.processing = True
+        try:
+            image_b64 = await model_manager.generate_image(request.prompt)
+            request_queue.queue.popleft()  # Remove processed request
+            
+            # Notify next user in queue if any
+            if request_queue.queue:
+                next_position = 1
+                for req in request_queue.queue:
+                    logger.info(f"User {req.user} is now at position {next_position}")
+                    next_position += 1
+            
+            return GenerationResponse(
+                generated_content=image_b64,
+                content_type="image",
+                model_used="stable-diffusion-3.5"
+            )
+        finally:
+            request_queue.processing = False
+
+@app.get("/queue-position")
+async def check_queue_position(current_user: User = Depends(get_current_user)):
+    position = request_queue.get_position(current_user.username)
+    return {
+        "position": position,
+        "message": f"Your request is at position {position}" if position > 0 else "You have no requests in queue"
+    }
 
 @app.get("/health")
 async def health_check():

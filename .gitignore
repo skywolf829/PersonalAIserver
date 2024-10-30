@@ -78,3 +78,6 @@ model_cache/
 .classpath
 .settings/
 huggingface.token
+
+backend/users.json
+backend/.secret

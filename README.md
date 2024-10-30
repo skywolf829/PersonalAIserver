@@ -35,6 +35,22 @@ pip install -r requirements.txt
 - Log in to Hugging Face with `huggingface-cli login` and use your personal access token
 - Run the backend with `python backend/backend.py`
 
+### Cloudflare tunnel setup
+- Install cloudflared: https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/
+1. Run `cloudflared tunnel login`
+2. Run `cloudflared tunnel create genai-api`
+3. Create a config file ~/.cloudflared/config.yml:
+```
+tunnel: <your-tunnel-id>
+credentials-file: /home/user/.cloudflared/<tunnel-id>.json
+
+ingress:
+  - hostname: <your-api-url>
+    service: http://localhost:8000
+  - service: http_status:404
+```
+4. Create DNS record `cloudflared tunnel route dns <tunnel-id> <your-api-url>`
+
 ## Local Frontend
 
 In case you want to run the frontend locally, follow the instructions below.

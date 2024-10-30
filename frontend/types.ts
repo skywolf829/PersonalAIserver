@@ -28,3 +28,8 @@ export interface Message {
   timestamp: Date
 }
 
+export interface QueueResponse {
+  status: 'queued';
+  position: number;
+  message: string;
+}
