@@ -32,10 +32,10 @@ jobs:
       - name: Install dependencies
         working-directory: ./frontend
         run: |
+          npm install -D @shadcn/ui
           npx shadcn@latest init
-          npx shadcn-ui init -y
-          npx shadcn-ui add alert button card input textarea
-          npm install react-markdown remark-gfm react-syntax-highlighter @types/react-syntax-highlighter lucide-react
+          npx shadcn@latest add alert button card input textarea
+          npm install lucide-react
           npm install -D @tailwindcss/typography
           npm install clsx tailwind-merge
           npm install
