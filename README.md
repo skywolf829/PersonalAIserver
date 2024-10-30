@@ -142,6 +142,9 @@ Quantized transformer models are supported to further reduce VRAM usage, but are
 The large stable diffusion model can barely fit in my 4090's VRAM with quantization.
 Chatbot speeds are extremely quick on my 4090, with image generation taking up to 30sec for 100 steps for 1024x1024 images.
 
+The system prompt for the language model can be found in `backend/system_prompt.txt`.
+At the moment, it is a spin on Anthropic's Claude 3.5 Sonnet model, released on October 22, 2024. https://docs.anthropic.com/en/release-notes/system-prompts#claude-3-5-sonnet
+
 ## Notes and disclaimers
 - I am not a web developer or security expert, so there are likely many security and usability issues with this project. Use at your own risk. The entire frontend and login system was generated with Claude.
 - This project is not affiliated with Meta or Stability AI, nor any company I work for. This is simply a personal project to learn about Hugging Face models and their deployment on local hardware.
