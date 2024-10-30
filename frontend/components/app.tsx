@@ -37,7 +37,7 @@ const Login = ({ onLogin, error }: LoginProps) => {
       <Card className="w-full max-w-md p-8 space-y-6">
         <div className="space-y-2 text-center">
           <h1 className="text-3xl font-bold">Welcome Back</h1>
-          <p className="text-gray-500">Sign in to access Skylar's AI models</p>
+          <p className="text-gray-500">Sign in to access Skylars AI models</p>
         </div>
         
         <form onSubmit={handleSubmit} className="space-y-4">

@@ -1,20 +1,24 @@
 # PersonalAIserver
 Stand up a GenAI server on your own available hardware. This project provides a web interface to interact with LLaMA and Stable Diffusion models (among others)for text, image, video, and 3D generation.
 
+Many people have a nice GPU on hand and are willing to use that instead of pay for subscriptions from OpenAI, Anthropic, etc. Here, you can host your own AI models, albeit with many limitations as compared to those great services.
+
 ## Features
-- Text generation using LLaMA 3.2-1B
-- Image generation using Stable Diffusion 3.5
+- Text generation using LLaMA 3.2-1B-Instruct
+- Image generation using Stable Diffusion 3.5 medium
 - User authentication and JWT token-based security
 - React-based frontend with modern UI components
 - FastAPI backend with CORS support
 
 ## Setup
 
-Fork this repository, setup GitHub Pages, and set the repository secret `NEXT_PUBLIC_API_URL` to the URL of the backend.
+The frontend for this is hosted on GitHub Pages, while the backend is hosted on your available server machine.
 
-The frontend will be available at `https://[username].github.io/PersonalAIserver`. Follow the instructions below to set up the backend.
+After setup, the frontend will be available at `https://[username].github.io/PersonalAIserver`. Follow the instructions below to set up the backend.
 
 ### Backend
+This requires python 3.11 and pytorch with cuda support. Non-cuda devices may also be supported, but will generally be slower, especially for image generation.
+
 1. Create conda environment
 ```
 conda create -n personalai python=3.11
