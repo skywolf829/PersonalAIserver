@@ -3,6 +3,11 @@ Stand up a GenAI server on your own available hardware. This project provides a 
 
 Many people have a nice GPU on hand and are willing to use that instead of pay for subscriptions from OpenAI, Anthropic, etc. Here, you can host your own AI models, albeit with many limitations as compared to those great services.
 
+![Login Screen](images/login.png)
+![Models page](images/models.png)
+![Text generation](images/text.png)
+![Image generation](images/image.png)
+
 ## Features
 - Text generation using LLaMA 3.2-1B-Instruct
 - Image generation using Stable Diffusion 3.5 medium
