@@ -1,7 +1,7 @@
 # PersonalAIserver
 Stand up a GenAI server on your own available hardware. This project provides a web interface to interact with LLaMA and Stable Diffusion models (among others)for text, image, video, and 3D generation.
 
-Many people have a nice GPU on hand and are willing to use that instead of pay for subscriptions from OpenAI, Anthropic, etc. Here, you can host your own AI models, albeit with many limitations as compared to those great services.
+Many people have a nice GPU on hand and are willing to use that instead of pay for subscriptions from OpenAI, Anthropic, etc. Here, you can host your own AI models, albeit with many limitations as compared to those great services. Then, you can access it from anywhere with a web browser, like your phone or another computer.
 
 ![Login Screen](images/login.png)
 ![Models page](images/models.png)
@@ -25,7 +25,7 @@ After setup, the frontend will be available at `https://[username].github.io/Per
 
 For the frontend, only a GitHub action needs to be setup to build the project page.
 In your forked repository, navigate to `Settings -> Pages -> Source`, and set it to "GitHub Actions".
-Next, navigate to the `Actions` tab, and 
+The build will automatically run when you push to the repository, thanks to the `.github/workflows/main.yml` file.
 
 ### Backend
 This requires python 3.11 and conda. Non-cuda devices may also be supported, but will generally be slower, especially for image generation.
