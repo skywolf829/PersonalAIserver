@@ -36,8 +36,9 @@ jobs:
           rm -rf .next
           rm -rf out
           rm -f package-lock.json
+          rm -f components.json
           npm cache clean --force
-          
+
       - name: Install dependencies
         working-directory: ./frontend
         run: |
