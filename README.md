@@ -127,4 +127,21 @@ npm install sharp
 npm run dev
 ```
 
+## Changing models
+In `backend/backend.py`, you may change the models used. Find the model on Hugging Face you'd like to use for text/image generation, and adjust the `ModelManager` model configs (line ~127). By default, this uses the LLaMA 3.2-1B-Instruct model for text generation and the Stable Diffusion 3.5 medium model for image generation.
+Below are the VRAM requirements for each model tested with.
 
+| Model Type | Model Name | VRAM Usage (GB) | Notes |
+|------------|------------|-----------------|--------|
+| Text | meta-llama/Llama-3.2-1B-Instruct | ~8 | Base model for text generation |
+| Image | stabilityai/stable-diffusion-3.5-medium | ~13 | Works well on RTX 4090 |
+| Image | stabilityai/stable-diffusion-3.5-large | ~20-30 | Exceeds 4090 VRAM for long prompts |
+
+Note: VRAM usage may vary depending on image resolution, length of text prompts, and other parameters. Values shown are approximate for default settings. 
+Quantized transformer models are supported to further reduce VRAM usage, but are not used by default.
+Chatbot speeds are extremely quick on my 4090, with image generation taking up to 30sec for 100 steps for 1024x1024 images.
+
+## Notes and disclaimers
+- I am not a web developer or security expert, so there are likely many security and usability issues with this project. Use at your own risk. The entire frontend and login system was generated with Claude.
+- This project is not affiliated with Meta or Stability AI, nor any company I work for. This is simply a personal project to learn about Hugging Face models and their deployment on local hardware.
+- I do not plan on maintaining this project. It is purely a hobby project for me to learn about LLMs and AI. Feel free to contribute yourself, I'd be happy to see some pull requests!

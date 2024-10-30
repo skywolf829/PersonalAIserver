@@ -175,21 +175,21 @@ class ModelManager:
 
             elif modality == "image":
                 logger.info(f"Loading image model from: {'cache' if is_cached else 'online'}")
-                nf4_config = BitsAndBytesConfig(
-                    load_in_4bit=True,
-                    bnb_4bit_quant_type="nf4",
-                    bnb_4bit_compute_dtype=torch.bfloat16
-                )
-                model_nf4 = SD3Transformer2DModel.from_pretrained(
-                    load_path,
-                    subfolder="transformer",
-                    quantization_config=nf4_config,
-                    torch_dtype=torch.bfloat16,
-                    cache_dir=str(cache_dir) if not is_cached else None
-                )
+                # nf4_config = BitsAndBytesConfig(
+                #     load_in_4bit=True,
+                #     bnb_4bit_quant_type="nf4",
+                #     bnb_4bit_compute_dtype=torch.bfloat16
+                # )
+                # model_nf4 = SD3Transformer2DModel.from_pretrained(
+                #     load_path,
+                #     subfolder="transformer",
+                #     quantization_config=nf4_config,
+                #     torch_dtype=torch.bfloat16,
+                #     cache_dir=str(cache_dir) if not is_cached else None
+                # )
                 model = StableDiffusion3Pipeline.from_pretrained(
                     load_path,
-                    transformer=model_nf4,
+                    #transformer=model_nf4,
                     torch_dtype=torch.bfloat16,
                     cache_dir=str(cache_dir) if not is_cached else None
                 ).to(self.device)
@@ -232,7 +232,7 @@ class ModelManager:
         
         try:
             pipeline = self.loaded_models["image"]["pipeline"]
-            image = pipeline(prompt, num_inference_steps=40, guidance_scale=4.5).images[0]
+            image = pipeline(prompt, num_inference_steps=100, guidance_scale=4.5).images[0]
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()  # Clear CUDA cache after generation
             buffered = BytesIO()
