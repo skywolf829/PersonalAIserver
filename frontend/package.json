@@ -1,6 +1,7 @@
 {
   "name": "temp",
   "version": "0.1.0",
+  "homepage": "https://skywolf829.github.io/PersonalAIserver",
   "private": true,
   "scripts": {
     "dev": "next dev",
