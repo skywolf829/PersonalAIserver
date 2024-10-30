@@ -54,9 +54,13 @@ const Login = ({ onLogin, error }: LoginProps) => {
           />
           
           {error && (
-            <Alert variant="destructive">
+            <Alert variant={error === "Failed to fetch" ? "default" : "destructive"}>
               <AlertCircle className="h-4 w-4" />
-              <AlertDescription>{error}</AlertDescription>
+              <AlertDescription>
+                {error === "Failed to fetch" 
+                  ? "The server appears to be down at the moment. Please try again later."
+                  : error}
+              </AlertDescription>
             </Alert>
           )}
           
