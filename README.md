@@ -30,6 +30,7 @@ The build will automatically run when you push to the repository, thanks to the 
 ### Frontend (Local hosted)
 
 In case you want to run the frontend locally, follow the instructions below.
+Requires Node.js, installable from [here](https://nodejs.org/en/download/prebuilt-installer).
 
 1. Setup app environment
 ```
