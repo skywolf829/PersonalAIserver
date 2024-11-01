@@ -1,4 +1,4 @@
-# PersonalAIserver
+# Personal AI server
 Stand up a GenAI server on your own available hardware. This project provides a web interface to interact with LLaMA and Stable Diffusion models (among others)for text, image, video, and 3D generation.
 
 Many people have a nice GPU on hand and are willing to use that instead of pay for subscriptions from OpenAI, Anthropic, etc. Here, you can host your own AI models, albeit with many limitations as compared to those great services. Then, you can access it from anywhere with a web browser, like your phone or another computer.
