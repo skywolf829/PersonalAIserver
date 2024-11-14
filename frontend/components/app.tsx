@@ -107,6 +107,7 @@ const ModelTile = ({ icon: Icon, title, description, onClick }: ModelTileProps) 
 
 const ModelInterface: React.FC<ModelInterfaceProps> = ({ type, onBack }) => {
   const [prompt, setPrompt] = useState('');
+  const [loraWeights, setLoraWeights] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -144,7 +145,10 @@ const ModelInterface: React.FC<ModelInterfaceProps> = ({ type, onBack }) => {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('token')}`
         },
-        body: JSON.stringify({ prompt: userMessage.content })
+        body: JSON.stringify({ 
+          prompt: userMessage.content,
+          lora_weights: loraWeights
+        })
       });
       
       if (!response.ok) throw new Error('Generation failed');
@@ -176,12 +180,24 @@ const ModelInterface: React.FC<ModelInterfaceProps> = ({ type, onBack }) => {
           <h2 className="text-2xl font-bold">Image Generation</h2>
           
           <form onSubmit={handleSubmit} className="space-y-4">
-            <Textarea
-              placeholder="Describe the image you want to generate..."
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              className="min-h-[100px]"
-            />
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Image Description</label>
+              <Textarea
+                placeholder="Describe the image you want to generate..."
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                className="min-h-[100px]"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">LoRA Weights (Optional)</label>
+              <Input
+                placeholder="Enter LoRA weights path..."
+                value={loraWeights}
+                onChange={(e) => setLoraWeights(e.target.value)}
+              />
+            </div>
             
             <Button type="submit" disabled={isLoading || !prompt} className="w-full">
               {isLoading ? (

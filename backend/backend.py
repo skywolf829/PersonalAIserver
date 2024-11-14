@@ -66,6 +66,7 @@ class GenerationRequest(BaseModel):
     prompt: str
     max_length: Optional[int] = 100
     temperature: Optional[float] = 0.7
+    lora_weights: Optional[str] = None  
 
 class GenerationResponse(BaseModel):
     generated_content: str
@@ -73,10 +74,11 @@ class GenerationResponse(BaseModel):
     model_used: str
 
 class QueuedRequest:
-    def __init__(self, user: str, prompt: str, request_type: str):
+    def __init__(self, user: str, prompt: str, request_type: str, lora_weights: Optional[str] = None):
         self.user = user
         self.prompt = prompt
         self.request_type = request_type
+        self.lora_weights = lora_weights
         self.timestamp = datetime.utcnow()
 
 class RequestQueue:
@@ -124,16 +126,21 @@ class ModelManager:
         logger.info(f"Using device: {self.device}")
         
         self.model_configs = {
-            "text": {
+            "llama-3.2": {
                 "model_id": "meta-llama/Llama-3.2-1B-Instruct",
                 "model_type": "text",
                 "cache_dir": CACHE_DIR / "Llama-3.2-1B",
                 "system_prompt": Path(__file__).parent.joinpath("system_prompt.txt").read_text()
             },
-            "image": {
+            "stable-diffusion-3-5": {
                 "model_id": "stabilityai/stable-diffusion-3.5-medium",
                 "model_type": "image",
                 "cache_dir": CACHE_DIR / "stable-diffusion-3.5-medium"
+            },
+            "flux": {
+                "model_id": "black-forest-labs/FLUX.1-dev",
+                "model_type": "image",
+                "cache_dir": CACHE_DIR / "flux"
             }
         }
         self.user_chat_history = {}
@@ -143,23 +150,23 @@ class ModelManager:
         cache_dir = self.model_configs[modality]["cache_dir"]
         return cache_dir.exists() and any(cache_dir.iterdir())
 
-    def load_model(self, modality: str):
-        if modality in self.loaded_models:
+    def load_model(self, model_name: str):
+        if model_name in self.loaded_models:
             return
 
-        config = self.model_configs[modality]
+        config = self.model_configs[model_name]
         model_id = config["model_id"]
         cache_dir = config["cache_dir"]
         cache_dir.mkdir(parents=True, exist_ok=True)
 
-        logger.info(f"Loading {modality} model: {model_id}")
-        is_cached = self.is_model_cached(modality)
+        logger.info(f"Loading {model_name} model: {model_id}")
+        is_cached = self.is_model_cached(model_name)
         load_path = str(cache_dir) if is_cached else model_id
         
         try:
-            if modality == "text":
+            if model_name == "llama-3.2":
                 logger.info(f"Loading text model from: {'cache' if is_cached else 'online'}")
-                self.loaded_models[modality] = {
+                self.loaded_models[model_name] = {
                     "pipeline": pipeline(
                         "text-generation",
                         model=load_path,
@@ -170,9 +177,9 @@ class ModelManager:
                 # Save model if it wasn't cached
                 if not is_cached:
                     logger.info("Saving text model to cache")
-                    self.loaded_models[modality]["pipeline"].save_pretrained(str(cache_dir))
+                    self.loaded_models[model_name]["pipeline"].save_pretrained(str(cache_dir))
 
-            elif modality == "image":
+            elif model_name == "stable-diffusion-3-5":
                 logger.info(f"Loading image model from: {'cache' if is_cached else 'online'}")
                 # nf4_config = BitsAndBytesConfig(
                 #     load_in_4bit=True,
@@ -193,26 +200,34 @@ class ModelManager:
                     cache_dir=str(cache_dir) if not is_cached else None
                 ).to(self.device)
                
-                self.loaded_models[modality] = {"pipeline": model}
+                self.loaded_models[model_name] = {"pipeline": model}
                 logger.info(f"Loaded image model from: {'cache' if is_cached else 'online'}")
                 # Save model if it wasn't cached
                 if not is_cached:
                     logger.info("Saving image model to cache")
                     model.save_pretrained(str(cache_dir))
+            elif model_name == "flux":
+                model = DiffusionPipeline.from_pretrained(load_path, torch_dtype=torch.bfloat16).to(self.device)
+                logger.info(f"Loading image model from: {'cache' if is_cached else 'online'}")
+                self.loaded_models[model_name] = {"pipeline": model}
+                logger.info(f"Loaded image model from: {'cache' if is_cached else 'online'}")   
+                if not is_cached:
+                    logger.info("Saving image model to cache")
+                    model.save_pretrained(str(cache_dir))
 
         except Exception as e:
-            logger.error(f"Error loading {modality} model: {str(e)}")
+            logger.error(f"Error loading {model_name} model: {str(e)}")
             raise HTTPException(status_code=500, detail=f"Failed to load model: {str(e)}")
 
-    async def generate_text(self, prompt: str, current_user: User):
-        if "text" not in self.loaded_models:
-            self.load_model("text")
+    async def generate_text_llama_3_2(self, prompt: str, current_user: User):
+        if "llama-3.2" not in self.loaded_models:
+            self.load_model("llama-3.2")
         
         if current_user.username not in self.user_chat_history:
             self.user_chat_history[current_user.username] = [{"role": "system", "content": self.model_configs["text"]["system_prompt"]}]
 
         try:
-            pipeline = self.loaded_models["text"]["pipeline"]
+            pipeline = self.loaded_models["llama-3.2"]["pipeline"]
             chat = self.user_chat_history[current_user.username]
             chat.append({"role": "user", "content": prompt})
             result = pipeline(chat, max_new_tokens=512)
@@ -225,13 +240,31 @@ class ModelManager:
             logger.error(f"Error generating text: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e))
 
-    async def generate_image(self, prompt: str):
-        if "image" not in self.loaded_models:
-            self.load_model("image")
+    async def generate_image_stable_diffusion_3_5(self, prompt: str):
+        if "stable-diffusion-3-5" not in self.loaded_models:
+            self.load_model("stable-diffusion-3-5")
         
         try:
-            pipeline = self.loaded_models["image"]["pipeline"]
+            pipeline = self.loaded_models["stable-diffusion-3-5"]["pipeline"]
             image = pipeline(prompt, num_inference_steps=100, guidance_scale=4.5).images[0]
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()  # Clear CUDA cache after generation
+            buffered = BytesIO()
+            image.save(buffered, format="PNG")
+            return base64.b64encode(buffered.getvalue()).decode()
+        except Exception as e:
+            logger.error(f"Error generating image: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    async def generate_image_flux(self, prompt: str, lora_weights: Optional[str] = None):
+        if "flux" not in self.loaded_models:
+            self.load_model("flux")
+        try:
+            pipeline = self.loaded_models["flux"]["pipeline"]
+            if lora_weights and lora_weights != "":
+                logger.info(f"Loading LoRA weights from: {lora_weights}")
+                pipeline.load_lora_weights(lora_weights)
+            image = pipeline(prompt, num_inference_steps=100, guidance_scale=2.5).images[0]
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()  # Clear CUDA cache after generation
             buffered = BytesIO()
@@ -339,13 +372,13 @@ async def generate_image(
     request: GenerationRequest,
     current_user: User = Depends(get_current_user)
 ):
-    queued_request = QueuedRequest(current_user.username, request.prompt, "image")
+    queued_request = QueuedRequest(current_user.username, request.prompt, "image", request.lora_weights)
     request_queue.add_request(queued_request)
 
     async with request_queue.lock:
         request_queue.processing = True
         try:
-            image_b64 = await model_manager.generate_image(request.prompt)
+            image_b64 = await model_manager.generate_image_flux(request.prompt, request.lora_weights)
             request_queue.queue.popleft()  # Remove processed request
             
             # Notify next user in queue if any
@@ -358,7 +391,7 @@ async def generate_image(
             return GenerationResponse(
                 generated_content=image_b64,
                 content_type="image",
-                model_used="stable-diffusion-3.5"
+                model_used="flux"
             )
         finally:
             request_queue.processing = False
