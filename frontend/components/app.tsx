@@ -313,7 +313,7 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
       type: 'image' as const,
       icon: Image,
       title: 'Image Generation',
-      description: 'Create images using Stable Diffusion 3.5'
+      description: 'Create images using Flux'
     }
   ] as const;
 
