@@ -81,3 +81,4 @@ huggingface.token
 
 backend/users.json
 backend/.secret
+frontend/components.json

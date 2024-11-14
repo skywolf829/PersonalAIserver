@@ -30,13 +30,14 @@ The build will automatically run when you push to the repository, thanks to the 
 ### Frontend (Local hosted)
 
 In case you want to run the frontend locally, follow the instructions below.
-Requires Node.js, installable from [here](https://nodejs.org/en/download/prebuilt-installer).
+Requires Node.js, installable from [node version manager (nvm)](https://github.com/nvm-sh/nvm).
 
-1. Setup app environment
+1. Setup app environment. From the frontend directory, run the following commands:
 ```
-npm install -D @shadcn/ui
-npx shadcn@latest init
-npx shadcn@latest add alert button card input textarea
+nvm install 20
+npm install -D @shadcn/ui 
+npx shadcn@latest init # Select default style, any color, and dont use css variables. 
+npx shadcn@latest add alert button card input textarea # Accept defaults
 npm install lucide-react
 npm install -D @tailwindcss/typography
 npm install clsx tailwind-merge
@@ -89,7 +90,7 @@ pip install -r requirements.txt
     ...
 }
 ```
-- Create a `.secret.key` file in the backend directory with a random string of your choosing. This is used to encrypt the JWT token. I recommend generating one with:
+- Create a `.secret` file in the backend directory with a random string of your choosing. This is used to encrypt the JWT token. I recommend generating one with:
 ```
 import secrets
 secret_key = secrets.token_hex(32)
