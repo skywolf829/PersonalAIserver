@@ -132,7 +132,7 @@ class ModelManager:
         self.model_configs = {
             "llama-3.2": {
                 "model_id": "meta-llama/Llama-3.2-1B-Instruct",
-                "model_type": "text",
+                "model_type": "text", 
                 "cache_dir": CACHE_DIR / "Llama-3.2-1B",
                 "system_prompt": Path(__file__).parent.joinpath("system_prompt.txt").read_text()
             },
@@ -148,6 +148,26 @@ class ModelManager:
             }
         }
         self.user_chat_history = {}
+        self.model_last_used = {}
+        self.unload_task = None
+
+    async def check_model_timeout(self):
+        while True:
+            await asyncio.sleep(60)  # Check every minute
+            current_time = datetime.now()
+            models_to_unload = []
+            
+            for model_name, last_used in self.model_last_used.items():
+                if (current_time - last_used).total_seconds() > 600:  # 10 minutes
+                    models_to_unload.append(model_name)
+            
+            for model_name in models_to_unload:
+                logger.info(f"Unloading {model_name} due to inactivity")
+                if model_name in self.loaded_models:
+                    del self.loaded_models[model_name]
+                    del self.model_last_used[model_name]
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
 
     def is_model_cached(self, modality: str) -> bool:
         """Check if the model is already cached locally."""
@@ -157,6 +177,10 @@ class ModelManager:
     def load_model(self, model_name: str):
         if model_name in self.loaded_models:
             return
+
+        # Start timeout checker if not already running
+        if self.unload_task is None:
+            self.unload_task = asyncio.create_task(self.check_model_timeout())
 
         config = self.model_configs[model_name]
         model_id = config["model_id"]
@@ -178,49 +202,39 @@ class ModelManager:
                     )
                 }
                 logger.info(f"Loaded text model from: {'cache' if is_cached else 'online'}")
-                # Save model if it wasn't cached
                 if not is_cached:
                     logger.info("Saving text model to cache")
                     self.loaded_models[model_name]["pipeline"].save_pretrained(str(cache_dir))
 
             elif model_name == "stable-diffusion-3-5":
                 logger.info(f"Loading image model from: {'cache' if is_cached else 'online'}")
-                # nf4_config = BitsAndBytesConfig(
-                #     load_in_4bit=True,
-                #     bnb_4bit_quant_type="nf4",
-                #     bnb_4bit_compute_dtype=torch.bfloat16
-                # )
-                # model_nf4 = SD3Transformer2DModel.from_pretrained(
-                #     load_path,
-                #     subfolder="transformer",
-                #     quantization_config=nf4_config,
-                #     torch_dtype=torch.bfloat16,
-                #     cache_dir=str(cache_dir) if not is_cached else None
-                # )
                 model = StableDiffusion3Pipeline.from_pretrained(
                     load_path,
-                    #transformer=model_nf4,
                     torch_dtype=torch.bfloat16,
                     cache_dir=str(cache_dir) if not is_cached else None
                 ).to(self.device)
                
                 self.loaded_models[model_name] = {"pipeline": model}
                 logger.info(f"Loaded image model from: {'cache' if is_cached else 'online'}")
-                # Save model if it wasn't cached
                 if not is_cached:
                     logger.info("Saving image model to cache")
                     model.save_pretrained(str(cache_dir))
             
             elif model_name == "flux":
-                model = FluxPipeline.from_pretrained(load_path, torch_dtype=torch.bfloat16)
-                model.enable_model_cpu_offload() #save some VRAM by offloading the model to CPU. Remove this if you have enough GPU power
-
+                model = FluxPipeline.from_pretrained(load_path, 
+                                                     torch_dtype=torch.bfloat16)
+                model.enable_model_cpu_offload()
+                model.vae.enable_tiling()
+                model.vae.enable_slicing()
                 logger.info(f"Loading image model from: {'cache' if is_cached else 'online'}")
                 self.loaded_models[model_name] = {"pipeline": model}
                 logger.info(f"Loaded image model from: {'cache' if is_cached else 'online'}")   
                 if not is_cached:
                     logger.info("Saving image model to cache")
                     model.save_pretrained(str(cache_dir))
+
+            # Update last used time when model is loaded
+            self.model_last_used[model_name] = datetime.now()
 
         except Exception as e:
             logger.error(f"Error loading {model_name} model: {str(e)}")
@@ -229,6 +243,9 @@ class ModelManager:
     async def generate_text_llama_3_2(self, prompt: str, current_user: User):
         if "llama-3.2" not in self.loaded_models:
             self.load_model("llama-3.2")
+        
+        # Update last used time
+        self.model_last_used["llama-3.2"] = datetime.now()
         
         if current_user.username not in self.user_chat_history:
             self.user_chat_history[current_user.username] = [{"role": "system", "content": self.model_configs["text"]["system_prompt"]}]
@@ -240,7 +257,7 @@ class ModelManager:
             result = pipeline(chat, max_new_tokens=512)
             self.user_chat_history[current_user.username] = result[0]["generated_text"]
             if torch.cuda.is_available():
-                torch.cuda.empty_cache()  # Clear CUDA cache after generation
+                torch.cuda.empty_cache()
             
             return result[0]["generated_text"][-1]['content']
         except Exception as e:
@@ -250,12 +267,15 @@ class ModelManager:
     async def generate_image_stable_diffusion_3_5(self, prompt: str):
         if "stable-diffusion-3-5" not in self.loaded_models:
             self.load_model("stable-diffusion-3-5")
+            
+        # Update last used time
+        self.model_last_used["stable-diffusion-3-5"] = datetime.now()
         
         try:
             pipeline = self.loaded_models["stable-diffusion-3-5"]["pipeline"]
             image = pipeline(prompt, num_inference_steps=100, guidance_scale=4.5).images[0]
             if torch.cuda.is_available():
-                torch.cuda.empty_cache()  # Clear CUDA cache after generation
+                torch.cuda.empty_cache()
             buffered = BytesIO()
             image.save(buffered, format="PNG")
             return base64.b64encode(buffered.getvalue()).decode()
@@ -264,21 +284,32 @@ class ModelManager:
             raise HTTPException(status_code=500, detail=str(e))
 
     async def generate_image_flux(self, prompt: str, lora_weights: Optional[str] = None):
+        logger.info(f"Generating image with prompt: {prompt} and LoRA weights: {lora_weights}")
         if "flux" not in self.loaded_models:
             self.load_model("flux")
+            
+        # Update last used time
+        self.model_last_used["flux"] = datetime.now()
+        
         try:
             pipeline = self.loaded_models["flux"]["pipeline"]
             if lora_weights and lora_weights != "":
                 logger.info(f"Loading LoRA weights from: {lora_weights}")
                 pipeline.load_lora_weights(lora_weights)
-            image = pipeline(prompt, num_inference_steps=25, guidance_scale=2.5).images[0]
+            image = pipeline(prompt, 
+                             max_sequence_length=512,
+                             height=512,
+                             width=512,
+                             num_inference_steps=25, 
+                             guidance_scale=2.5).images[0]
             timestamp = datetime.now().strftime('%y%m%d-%H%M')
             random_bits = uuid.uuid4().hex[:6]  # 6 characters from UUID
             img_name = f"{timestamp}-{random_bits}.png"
+            logger.info(f"Saving image to: {IMAGE_CACHE_DIR / img_name}")
             image.save(IMAGE_CACHE_DIR / img_name)
 
             if torch.cuda.is_available():
-                torch.cuda.empty_cache()  # Clear CUDA cache after generation
+                torch.cuda.empty_cache()
             buffered = BytesIO()
             image.save(buffered, format="PNG")
             return base64.b64encode(buffered.getvalue()).decode()
