@@ -102,7 +102,10 @@ and then copying the output.
 - Navigate to `Settings -> Secrets and variables -> Actions` in your forked repository
 - Add a repository secret with the name `NEXT_PUBLIC_API_URL` and the value being the URL of the backend server (more details below). Example: `https://api.example.com`.
 
-6. Running the backend
+6. Adjust CORS origins
+- In `backend/backend.py`, adjust the `CORSMiddleware` near line 40 to include the URLs of your frontend.
+
+7. Running the backend
 - Log in to Hugging Face with `huggingface-cli login` and use your personal access token created above as the password.
 - Run the backend with `python backend/backend.py --public`, or remove `--public` if you want to run the server on localhost only. Localhost requires you run the frontend locally as well.
 

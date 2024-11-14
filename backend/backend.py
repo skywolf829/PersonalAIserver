@@ -40,8 +40,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://skywolf829.github.io", 
                    "http://localhost:3000"
-                   "https://swwurster.com"
-                   "https://api.swwurster.com"],
+                   ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
