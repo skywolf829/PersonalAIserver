@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import torch
 from transformers import pipeline
-from diffusers import StableDiffusion3Pipeline, BitsAndBytesConfig, SD3Transformer2DModel, DiffusionPipeline
+from diffusers import StableDiffusion3Pipeline, BitsAndBytesConfig, SD3Transformer2DModel, DiffusionPipeline, FluxPipeline
 import uvicorn
 from typing import List, Optional
 from datetime import datetime, timedelta
@@ -19,6 +19,8 @@ import argparse
 import psutil
 import asyncio
 from collections import deque
+import uuid
+from datetime import datetime
 
 # Security configuration
 SECRET_KEY = Path(__file__).parent.joinpath(".secret").read_text()
@@ -32,6 +34,8 @@ logger = logging.getLogger(__name__)
 # Setup model cache directory
 CACHE_DIR = Path("model_cache")
 CACHE_DIR.mkdir(exist_ok=True)
+IMAGE_CACHE_DIR = Path("image_cache")
+IMAGE_CACHE_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(title="AI Server")
 
@@ -206,8 +210,11 @@ class ModelManager:
                 if not is_cached:
                     logger.info("Saving image model to cache")
                     model.save_pretrained(str(cache_dir))
+            
             elif model_name == "flux":
-                model = DiffusionPipeline.from_pretrained(load_path, torch_dtype=torch.bfloat16).to(self.device)
+                model = FluxPipeline.from_pretrained(load_path, torch_dtype=torch.bfloat16)
+                model.enable_model_cpu_offload() #save some VRAM by offloading the model to CPU. Remove this if you have enough GPU power
+
                 logger.info(f"Loading image model from: {'cache' if is_cached else 'online'}")
                 self.loaded_models[model_name] = {"pipeline": model}
                 logger.info(f"Loaded image model from: {'cache' if is_cached else 'online'}")   
@@ -264,7 +271,12 @@ class ModelManager:
             if lora_weights and lora_weights != "":
                 logger.info(f"Loading LoRA weights from: {lora_weights}")
                 pipeline.load_lora_weights(lora_weights)
-            image = pipeline(prompt, num_inference_steps=100, guidance_scale=2.5).images[0]
+            image = pipeline(prompt, num_inference_steps=25, guidance_scale=2.5).images[0]
+            timestamp = datetime.now().strftime('%y%m%d-%H%M')
+            random_bits = uuid.uuid4().hex[:6]  # 6 characters from UUID
+            img_name = f"{timestamp}-{random_bits}.png"
+            image.save(IMAGE_CACHE_DIR / img_name)
+
             if torch.cuda.is_available():
                 torch.cuda.empty_cache()  # Clear CUDA cache after generation
             buffered = BytesIO()
@@ -324,7 +336,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     if not user:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     access_token = create_access_token(data={"sub": user.username})
-    model_manager.user_chat_history[user.username] = [{"role": "system", "content": model_manager.model_configs["text"]["system_prompt"]}]
+    model_manager.user_chat_history[user.username] = [{"role": "system", "content": model_manager.model_configs["llama-3.2"]["system_prompt"]}]
     return {"access_token": access_token, "token_type": "bearer"}
 
 @app.get("/")
