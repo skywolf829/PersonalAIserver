@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AlertCircle, Terminal, Image, Loader2, Send, LucideIcon } from 'lucide-react';
+import { AlertCircle, Terminal, Image, Loader2, Send, LucideIcon, Video } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -169,6 +169,69 @@ const ModelInterface: React.FC<ModelInterfaceProps> = ({ type, onBack }) => {
     }
   };
 
+  if (type === 'video') {
+    return (
+      <div className="max-w-3xl mx-auto p-6 space-y-6">
+        <Button variant="ghost" onClick={onBack} className="mb-4">
+          ← Back to Models
+        </Button>
+        
+        <Card className="p-6 space-y-4">
+          <h2 className="text-2xl font-bold">Video Generation</h2>
+          
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Video Description</label>
+              <Textarea
+                placeholder="Describe the video you want to generate..."
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                className="min-h-[100px]"
+              />
+            </div>
+            
+            <Button type="submit" disabled={isLoading || !prompt} className="w-full">
+              {isLoading ? (
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+              ) : (
+                <Send className="h-4 w-4 mr-2" />
+              )}
+              Generate
+            </Button>
+          </form>
+          
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{error}</AlertDescription>
+            </Alert>
+          )}
+          
+          {messages.length > 0 && (
+            <div className="space-y-4">
+              {messages.map((msg, index) => (
+                msg.role === 'assistant' && (
+                  <div key={index} className="mt-4">
+                    <video 
+                      controls
+                      className="max-w-full rounded-lg shadow-lg"
+                    >
+                      <source 
+                        src={`data:video/mp4;base64,${msg.content}`}
+                        type="video/mp4"
+                      />
+                      Your browser does not support the video tag.
+                    </video>
+                  </div>
+                )
+              ))}
+            </div>
+          )}
+        </Card>
+      </div>
+    );
+  }
+
   if (type === 'image') {
     return (
       <div className="max-w-3xl mx-auto p-6 space-y-6">
@@ -300,7 +363,7 @@ const ModelInterface: React.FC<ModelInterfaceProps> = ({ type, onBack }) => {
 };
 
 const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
-  const [selectedModel, setSelectedModel] = useState<'text' | 'image' | null>(null);
+  const [selectedModel, setSelectedModel] = useState<'text' | 'image' | 'video' | null>(null);
   
   const models = [
     {
@@ -314,6 +377,12 @@ const Dashboard = ({ onLogout }: { onLogout: () => void }) => {
       icon: Image,
       title: 'Image Generation',
       description: 'Create images using Flux'
+    },
+    {
+      type: 'video' as const,
+      icon: Video,
+      title: 'Video Generation',
+      description: 'Create videos using Mochi-1'
     }
   ] as const;
 
