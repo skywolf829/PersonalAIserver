@@ -210,8 +210,8 @@ const ModelInterface: React.FC<ModelInterfaceProps> = ({ type, onBack }) => {
           {messages.length > 0 && (
             <div className="space-y-4">
               {messages.map((msg, index) => (
-                msg.role === 'assistant' && (
-                  <div key={index} className="mt-4">
+                <div key={index} className="mt-4">
+                  {msg.role === 'assistant' ? (
                     <video 
                       controls
                       className="max-w-full rounded-lg shadow-lg"
@@ -222,8 +222,12 @@ const ModelInterface: React.FC<ModelInterfaceProps> = ({ type, onBack }) => {
                       />
                       Your browser does not support the video tag.
                     </video>
-                  </div>
-                )
+                  ) : (
+                    <div className="text-sm text-gray-600 mt-2">
+                      <span className="font-medium">Prompt:</span> {msg.content}
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           )}
@@ -242,6 +246,26 @@ const ModelInterface: React.FC<ModelInterfaceProps> = ({ type, onBack }) => {
         <Card className="p-6 space-y-4">
           <h2 className="text-2xl font-bold">Image Generation</h2>
           
+          {messages.length > 0 && (
+            <div className="space-y-4">
+              {messages.slice().reverse().map((msg, index) => (
+                <div key={index} className="mt-4">
+                  {msg.role === 'assistant' ? (
+                    <img 
+                      src={`data:image/png;base64,${msg.content}`}
+                      alt="Generated content"
+                      className="max-w-full rounded-lg shadow-lg"
+                    />
+                  ) : (
+                    <div className="text-sm text-gray-600 mt-2">
+                      <span className="font-medium">Prompt:</span> {msg.content}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <label className="text-sm font-medium">Image Description</label>
@@ -277,22 +301,6 @@ const ModelInterface: React.FC<ModelInterfaceProps> = ({ type, onBack }) => {
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
-          )}
-          
-          {messages.length > 0 && (
-            <div className="space-y-4">
-              {messages.map((msg, index) => (
-                msg.role === 'assistant' && (
-                  <div key={index} className="mt-4">
-                    <img 
-                      src={`data:image/png;base64,${msg.content}`}
-                      alt="Generated content"
-                      className="max-w-full rounded-lg shadow-lg"
-                    />
-                  </div>
-                )
-              ))}
-            </div>
           )}
         </Card>
       </div>
