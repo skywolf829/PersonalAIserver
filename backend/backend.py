@@ -242,6 +242,7 @@ class ModelManager:
                 if not is_cached:
                     logger.info("Saving image model to cache")
                     model.save_pretrained(str(cache_dir))
+           
             elif model_name == "mochi-1":
                 pipe = MochiPipeline.from_pretrained("genmo/mochi-1-preview", variant="bf16", torch_dtype=torch.bfloat16)
 
