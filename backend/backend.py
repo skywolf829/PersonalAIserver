@@ -244,11 +244,13 @@ class ModelManager:
                     model.save_pretrained(str(cache_dir))
            
             elif model_name == "mochi-1":
-                pipe = MochiPipeline.from_pretrained("genmo/mochi-1-preview", variant="bf16", torch_dtype=torch.bfloat16)
+                pipe = MochiPipeline.from_pretrained("genmo/mochi-1-preview", 
+                                                     variant="bf16", torch_dtype=torch.bfloat16)
 
                 # Enable memory savings
                 pipe.enable_model_cpu_offload()
                 pipe.enable_vae_tiling()
+                pipe.enable_vae_slicing()
                 self.loaded_models[model_name] = {"pipeline": pipe}
                 logger.info(f"Loaded video model from: {'cache' if is_cached else 'online'}")
                 if not is_cached:
