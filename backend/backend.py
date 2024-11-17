@@ -166,6 +166,8 @@ class ModelManager:
                 if model_name in self.loaded_models:
                     del self.loaded_models[model_name]
                     del self.model_last_used[model_name]
+                else:
+                    logger.info(f"Couldn't find {model_name} in loaded_models, nothing to unload")
                 if torch.cuda.is_available():
                     torch.cuda.empty_cache()
 
