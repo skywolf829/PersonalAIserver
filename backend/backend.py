@@ -4,7 +4,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import torch
 from transformers import pipeline
-from diffusers import StableDiffusion3Pipeline, BitsAndBytesConfig, SD3Transformer2DModel, DiffusionPipeline, FluxPipeline
+from diffusers import StableDiffusion3Pipeline, MochiPipeline, BitsAndBytesConfig, SD3Transformer2DModel, DiffusionPipeline, FluxPipeline
+from diffusers.utils import export_to_video
 import uvicorn
 from typing import List, Optional
 from datetime import datetime, timedelta
@@ -36,6 +37,8 @@ CACHE_DIR = Path("model_cache")
 CACHE_DIR.mkdir(exist_ok=True)
 IMAGE_CACHE_DIR = Path("image_cache")
 IMAGE_CACHE_DIR.mkdir(exist_ok=True)
+VIDEO_CACHE_DIR = Path("video_cache")
+VIDEO_CACHE_DIR.mkdir(exist_ok=True)
 
 app = FastAPI(title="AI Server")
 
@@ -145,6 +148,11 @@ class ModelManager:
                 "model_id": "black-forest-labs/FLUX.1-dev",
                 "model_type": "image",
                 "cache_dir": CACHE_DIR / "flux"
+            },
+            "mochi-1": {
+                "model_id": "genmo/mochi-1-preview",
+                "model_type": "video",
+                "cache_dir": CACHE_DIR / "mochi-1"
             }
         }
         self.user_chat_history = {}
@@ -234,9 +242,17 @@ class ModelManager:
                 if not is_cached:
                     logger.info("Saving image model to cache")
                     model.save_pretrained(str(cache_dir))
+            elif model_name == "mochi-1":
+                pipe = MochiPipeline.from_pretrained("genmo/mochi-1-preview", variant="bf16", torch_dtype=torch.bfloat16)
 
-            # Update last used time when model is loaded
-            self.model_last_used[model_name] = datetime.now()
+                # Enable memory savings
+                pipe.enable_model_cpu_offload()
+                pipe.enable_vae_tiling()
+                self.loaded_models[model_name] = {"pipeline": pipe}
+                logger.info(f"Loaded video model from: {'cache' if is_cached else 'online'}")
+                if not is_cached:
+                    logger.info("Saving video model to cache")
+                    pipe.save_pretrained(str(cache_dir))
 
         except Exception as e:
             logger.error(f"Error loading {model_name} model: {str(e)}")
@@ -319,6 +335,28 @@ class ModelManager:
             logger.error(f"Error generating image: {str(e)}")
             raise HTTPException(status_code=500, detail=str(e))
 
+    async def generate_video_mochi_1(self, prompt: str):
+        if "mochi-1" not in self.loaded_models:
+            self.load_model("mochi-1")
+            
+        # Update last used time
+        self.model_last_used["mochi-1"] = datetime.now()
+        
+        try:
+            pipeline = self.loaded_models["mochi-1"]["pipeline"]
+            video = pipeline(prompt, num_frames=84).frames[0]
+
+            timestamp = datetime.now().strftime('%y%m%d-%H%M')
+            random_bits = uuid.uuid4().hex[:6]  # 6 characters from UUID
+            video_name = f"{timestamp}-{random_bits}.mp4"
+            
+            logger.info(f"Saving video to: {IMAGE_CACHE_DIR / video_name}")
+            export_to_video(video, VIDEO_CACHE_DIR / video_name, fps=30)
+            
+            return base64.b64encode(video.tobytes()).decode()
+        except Exception as e:
+            logger.error(f"Error generating video: {str(e)}")
+            raise HTTPException(status_code=500, detail=str(e))
 # Initialize model manager
 model_manager = ModelManager()
 
@@ -440,6 +478,36 @@ async def generate_image(
             )
         finally:
             request_queue.processing = False
+
+@app.post("/generate/video")
+async def generate_video(
+    request: GenerationRequest,
+    current_user: User = Depends(get_current_user)
+):
+    queued_request = QueuedRequest(current_user.username, request.prompt, "video")
+    request_queue.add_request(queued_request)
+
+    async with request_queue.lock:
+        request_queue.processing = True
+        try:
+            video_b64 = await model_manager.generate_video_mochi_1(request.prompt)
+            request_queue.queue.popleft()  # Remove processed request
+            
+            # Notify next user in queue if any
+            if request_queue.queue:
+                next_position = 1
+                for req in request_queue.queue:
+                    logger.info(f"User {req.user} is now at position {next_position}")
+                    next_position += 1
+            
+            return GenerationResponse(
+                generated_content=video_b64,
+                content_type="video",
+                model_used="mochi-1"
+            )
+        finally:
+            request_queue.processing = False
+
 
 @app.get("/queue-position")
 async def check_queue_position(current_user: User = Depends(get_current_user)):

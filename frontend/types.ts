@@ -14,7 +14,7 @@ export interface ModelTileProps {
 }
 
 export interface ModelInterfaceProps {
-  type: 'text' | 'image'
+  type: 'text' | 'image' | 'video' | '3d'
   onBack: () => void
 }
 
